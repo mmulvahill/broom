@@ -85,6 +85,39 @@ tidy.lme <- function(x, effects = "random", ...) {
     ret
 }
 
+#' @rdname nlme_tidiers
+#' 
+#' @importFrom plyr ldply
+#' @import dplyr
+#' @export
+tidy.gls <- function(x, effects = "random", ...) {
+    effects <- match.arg(effects, c("random", "fixed"))
+    if (effects == "fixed") {
+        # return tidied fixed effects rather than random
+        ret <- summary(x)$tTable
+
+        # p-values are always there in nlme before Douglas banned them in lme4
+        nn <- c("estimate", "std.error", "statistic", "p.value") 
+        # remove DF
+        return(fix_data_frame(ret[,-3], newnames = nn, newcol = "term"))
+    }
+
+    # fix to be a tidy data frame
+    fix <- function(g) {
+        newg <- fix_data_frame(g, newnames = colnames(g), newcol = "level")
+        # fix_data_frame doesn't create a new column if rownames are numeric,
+        # which doesn't suit our purposes
+        newg$level <- rownames(g)
+        cbind(.id = attr(g,"grpNames"),newg )
+    }
+
+    # combine them and gather terms
+    ret <-  fix(stats::coef(x))    %>%
+        tidyr::gather(term, estimate, -.id, -level)
+    colnames(ret)[1] <- "group"
+    ret
+}
+
 
 #' @rdname nlme_tidiers
 #' 
